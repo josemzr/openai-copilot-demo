@@ -1,0 +1,67 @@
+name: Issue Workflow
+
+on:
+  issues:
+    types: [opened]
+
+env:
+  AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+  AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+  CHAT_COMPLETIONS_DEPLOYMENT_NAME: ${{ secrets.CHAT_COMPLETIONS_DEPLOYMENT_NAME }}
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: write
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Generate Angular Component using GPT-4o
+      env:
+        PYTHONUNBUFFERED: "1"
+      run: |
+        cd generator
+        mkdir -p temp
+        echo "${{ github.event.issue.body }}" > temp/body.txt
+        echo "${{ github.event.issue.title }}" > temp/title.txt
+        pip3 install -r requirements.txt
+        python3 generator.py
+
+    - name: Install Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Install Angular CLI
+      run: |
+        npm install -g @angular/cli
+        ng version
+
+    - name: Build Angular component
+      run: |
+        APP_NAME=$(cat generator/temp/appname.txt)
+        ng generate component $APP_NAME
+        cp generator/temp/*.ts src/app/$APP_NAME
+        cp generator/temp/*.html src/app/$APP_NAME
+        cp generator/temp/*.css src/app/$APP_NAME
+        mkdir -p openapi
+        cp generator/temp/$APP_NAME.yml openapi/$APP_NAME.yml
+
+    - name: Commit and push generated component
+      run: |
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git add .
+        git commit -m "generated component"
+        git push
+
+    - name: Publish summary to issue
+      env:
+        GH_TOKEN: ${{ secrets.JOSEMZR_TOKEN }}
+        GH_REPO: ${{ github.repository }}
+      run: gh issue comment "${{ github.event.issue.number }}" --body-file generator/temp/summary.md
