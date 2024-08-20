@@ -7,7 +7,7 @@ import { Task } from './task.model';
   providedIn: 'root'
 })
 export class TaskManagerService {
-  private apiUrl = 'https://api.example.com/tasks';
+  private apiUrl = 'http://ai-tef-hispam-api:8000/tasks';
 
   constructor(private http: HttpClient) {}
 
